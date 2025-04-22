@@ -1,4 +1,5 @@
 import mysql.connector
+import pandas as pd
 
 def get_mysql_connection():
     # Temporary hardcoded connection (replace later with .env)
@@ -12,12 +13,14 @@ def get_mysql_connection():
 
 def execute_sql_query(query):
     conn = get_mysql_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor()
 
-    cursor.execute(query)
-    result = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
-
-    return result
+    try:
+        cursor.execute(query)
+        result = cursor.fetchall()
+        columns = cursor.column_names
+        df = pd.DataFrame(result, columns=columns)
+        return df
+    finally:
+        cursor.close()
+        conn.close()

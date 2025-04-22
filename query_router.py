@@ -1,15 +1,17 @@
 from backend.nosql.nosql_handler import execute_mongo_query
 from backend.sql.sql_handler import execute_sql_query
+from backend.nlp.parser import parse_nl_query
 
-def handle_query(nl_query, db_type):
-    # Later this comes from NLP parser
+def handle_query(nl_query: str, db_type: str):
+    parsed = parse_nl_query(nl_query, db_type)
+
+    if "error" in parsed:
+        return f"Error parsing query: {parsed['error']}"
+    
     if db_type == "sql":
-        sql_query = "SELECT * FROM test_table LIMIT 5;"
-        return execute_sql_query(sql_query)
+        return execute_sql_query(parsed["sql"])
     
     elif db_type == "nosql":
-        mongo_pipeline = [
-            {"$match": {}}, # No filter for now
-            {"$limit": 5}
-        ]
-        return execute_mongo_query("dsci351", "test_collection", mongo_pipeline)
+        return execute_mongo_query(parsed["db"], parsed["collection"], parsed["pipeline"])
+    
+    return "Unsupported database type."
