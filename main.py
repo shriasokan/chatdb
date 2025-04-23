@@ -24,9 +24,9 @@ if __name__ == "__main__":
     # print(handle_query("Find the electric vehicle with VIN 123ABC", "sql", table="electric_vehicles"))
 
     #print("Mongo Schema 1: List collections")
-    #print(handle_query("List 10 air quality readings", "nosql"))
+    #print(handle_query("Show top 10 movies by IMDB rating", "nosql", table="imdb_top_1000"))
 
     #print("Mongo Schema 2: Sample electric vehicles")
-    # print(handle_query("Insert a new air quality reading with geo_place Queens and data_value 0.7", "nosql",table="air_quality"))
+    #print(handle_query("Delete a new air quality reading with geo_place Queens and data_value 0.7", "nosql",table="air_quality"))
 
     print(handle_query("Show all air quality readings where geo_place is Queens and data_value is 0.7", "nosql", table="air_quality"))

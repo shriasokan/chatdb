@@ -167,6 +167,7 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
 
         # Cleaned queries
         cleaned = re.sub(r"```(?:json|python)?", "", raw_text).replace("```", "")
+        cleaned = re.sub(r"^\s*sql\s+", "", cleaned, flags=re.IGNORECASE) # added by vismay
         cleaned = re.sub(r"#.*", "", cleaned)
         cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
@@ -217,32 +218,17 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
         
         parsed = json.loads(cleaned)
 
-        if "pipeline" in parsed:
-            pipeline = parsed["pipeline"]
+        pipeline = parsed.get("pipeline", [])
 
-
-        # Handle known modification pipelines like $insertOne, $updateOne, etc.
-        if isinstance(pipeline, list) and len(pipeline) == 1 and isinstance(pipeline[0], dict):
-            for mod_op in ["$insertOne", "$insertMany", "$updateOne", "$deleteOne"]:
-                if mod_op in pipeline[0]:
-                    parsed = {
-                        "db": parsed.get("db", "dsci351"),
-                        "collection": parsed.get("collection", ""),
-                        mod_op.lstrip("$"): pipeline[0][mod_op]
-                    }
-                    return parsed
-
-        # Convert certain $merge-based pipelines into insertOne
-        elif (
+        # Handle $merge-based pseudo-inserts
+        if (
             isinstance(pipeline, list)
             and len(pipeline) >= 3
             and "$merge" in pipeline[-1]
             and "$addFields" in pipeline[1]
         ):
-            add_fields = pipeline[1].get("$addFields", {})
-            doc_key = next(iter(add_fields), None)
-            doc_val = add_fields[doc_key] if doc_key else None
-
+            doc_key = next(iter(pipeline[1]["$addFields"]), None)
+            doc_val = pipeline[1]["$addFields"][doc_key] if doc_key else None
             if isinstance(doc_val, dict):
                 parsed = {
                     "db": parsed.get("db", "dsci351"),
@@ -252,10 +238,21 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
                     }
                 }
 
-        elif not any(mod_op in stage for stage in pipeline if isinstance(stage, dict) for mod_op in ["$insertOne", "$insertMany", "$updateOne", "$deleteOne"]):
-            return {
-                "error": "Unsupported or unrecognized MongoDB pipeline structure."
-            }
+        # Handle insert/update/deleteOne pipelines
+        elif (
+            isinstance(pipeline, list)
+            and len(pipeline) == 1
+            and isinstance(pipeline[0], dict)
+        ):
+            for mod_op in ["$insertOne", "$insertMany", "$updateOne", "$deleteOne"]:
+                if mod_op in pipeline[0]:
+                    parsed = {
+                        "db": parsed.get("db", "dsci351"),
+                        "collection": parsed.get("collection", ""),
+                        mod_op.lstrip("$"): pipeline[0][mod_op]
+                    }
+
+
 
 
         # Override the db name
