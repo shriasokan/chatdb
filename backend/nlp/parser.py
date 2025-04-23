@@ -28,20 +28,34 @@ def parse_nl_query(nl_query: str, db_type: str, table: str = ""):
                 table = "electric_vehicles"
             elif "imdb_top_1000" in query_lower:
                 table = "imdb_top_1000"
-        if table:
+        if not table:
+            return {"error": "Could not determine collection/table for sample rows."}
+        if db_type == "sql":
             return {"schema_explore": "sample_rows", "table": table}
-        else:
-            return {"error": "Could not determine table for sample rows request."}
+        elif db_type == "nosql":
+            return {"schema_explore": "sample_documents", "collection": table}
         
-    # Data modification rules
-    if query_lower.startswith("insert") or "add a new" in query_lower:
-        return {"modification": "insert", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
+    # SQL Data modification rules
+    if db_type == "sql":
+        if query_lower.startswith("insert") or "add a new" in query_lower:
+            return {"modification": "insert", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
 
-    if query_lower.startswith("delete") or "remove" in query_lower:
-        return {"modification": "delete", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
+        if query_lower.startswith("delete") or "remove" in query_lower:
+            return {"modification": "delete", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
 
-    if query_lower.startswith("update") or "set" in query_lower:
-        return {"modification": "update", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
+        if query_lower.startswith("update") or "set" in query_lower:
+            return {"modification": "update", "sql": parse_with_gemini(nl_query, db_type, table).get("sql")}
+    
+    # NoSQL Data modification rules
+    if db_type == "nosql":
+        if any(kw in query_lower for kw in ["insert", "add a new"]):
+            return parse_with_gemini(nl_query, db_type, table)
+        
+        if any(kw in query_lower for kw in ["delete", "remove"]):
+            return parse_with_gemini(nl_query, db_type, table)
+        
+        if any(kw in query_lower for kw in ["update", "set"]):
+            return parse_with_gemini(nl_query, db_type, table)
     
     # SQL rules
     if db_type == "sql":
@@ -99,6 +113,35 @@ def parse_nl_query(nl_query: str, db_type: str, table: str = ""):
                 "collection": "electric_vehicles",
                 "pipeline": [{"$match": {"State": "CA"}}]
             }
+        if "what collections" in query_lower or "list collections" in query_lower:
+            return {"schema_explore": "list_collections"}
+    
+        if "sample document" in query_lower or "example from" in query_lower:
+            if "electric_vehicles" in query_lower:
+                return {"schema_explore": "sample_documents", "collection": "electric_vehicles"}
+            if "air_quality" in query_lower:
+                return {"schema_explore": "sample_documents", "collection": "air_quality"}
+            
+        match = re.search(r"list (\d+)\s+(electric vehicles|movies|air quality readings)", query_lower)
+
+    # Dynamic limit handling in MongoDB
+    if match:
+        limit = int(match.group(1))
+        keyword = match.group(2)
+
+        collection = ""
+        if "electric" in keyword:
+            collection = "electric_vehicles"
+        elif "movie" in keyword:
+            collection = "imdb_top_1000"
+        elif "air" in keyword:
+            collection = "air_quality"
+
+        return {
+            "db": "dsci351",
+            "collection": collection,
+            "pipeline": [{"$limit": limit}]
+        }
         
     # Resort to openai LLM if our rules don't work
     return parse_with_gemini(nl_query, db_type, table)
@@ -107,8 +150,8 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
     prompt = f"""
     Convert this natural language request into a {db_type.upper()} query only.
     - If SQL: return a single SQL string only.
-    - If MongoDB: return a Python dict with keys "db", "collection", and "pipeline" (list of Mongo aggregation stages).
-    - Do NOT include markdown formatting like ```sql.
+    - If MongoDB: return a Python dict with keys "db", "collection", and "pipeline" (list of Mongo aggregation stages). Do NOT include comments, markdown, or extra explanations. Just valid machine-readable output.
+    - Output must be valid JSON or SQL and parseable.
 
     Natural Language Query:
     \"\"\"{nl_query}\"\"\"
@@ -119,36 +162,20 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
     try:
         model = genai.GenerativeModel("models/gemini-1.5-pro-latest")
         response = model.generate_content(prompt)
-        '''
-        # output = response.text.strip()
-
-        # Extract first line that looks like an actual SQL command
-        lines = output.splitlines()
-        sql_lines = [line.strip() for line in lines if line.strip().lower().startswith(("insert", "update", "delete", "select"))]
-        if sql_lines:
-            output = sql_lines[0]
-        else:
-            output = output.strip()
-
-        # Add semicolon if missing
-        if not output.endswith(";"):
-            output += ";"
-
-        # output = output.replace("```sql", "").replace("```", "").strip()
-        '''
-
         raw_text = response.text.strip()
         print("Gemini Raw Output:", repr(raw_text))
 
-        # Grab first SQL-looking line
-        lines = raw_text.splitlines()
-        sql_lines = [line.strip() for line in lines if line.strip().lower().startswith(("insert", "update", "delete", "select"))]
-        output = sql_lines[0] if sql_lines else raw_text
+        # Cleaned queries
+        cleaned = re.sub(r"```(?:json|python)?", "", raw_text).replace("```", "")
+        cleaned = re.sub(r"#.*", "", cleaned)
+        cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        #print("CLEANED JSON:", cleaned)
 
-        if not output.endswith(";"):
-            output += ";"
-            
         if db_type == "sql":
+            output = cleaned
+            if not output.endswith(";"):
+                output += ";"
             # Regex substitutions for incorrect Gemini query interpretations
 
             if table == "imdb_top_1000":
@@ -186,8 +213,188 @@ def parse_with_gemini(nl_query: str, db_type: str, table: str = ""):
 
             return {"sql": output}
         
-        elif db_type == "nosql":
-            return json.loads(output)
+        # Fix Gemini putting modification commands inside a pipeline
+        
+        parsed = json.loads(cleaned)
+
+        if "pipeline" in parsed:
+            pipeline = parsed["pipeline"]
+
+
+        # Handle known modification pipelines like $insertOne, $updateOne, etc.
+        if isinstance(pipeline, list) and len(pipeline) == 1 and isinstance(pipeline[0], dict):
+            for mod_op in ["$insertOne", "$insertMany", "$updateOne", "$deleteOne"]:
+                if mod_op in pipeline[0]:
+                    parsed = {
+                        "db": parsed.get("db", "dsci351"),
+                        "collection": parsed.get("collection", ""),
+                        mod_op.lstrip("$"): pipeline[0][mod_op]
+                    }
+                    return parsed
+
+        # Convert certain $merge-based pipelines into insertOne
+        elif (
+            isinstance(pipeline, list)
+            and len(pipeline) >= 3
+            and "$merge" in pipeline[-1]
+            and "$addFields" in pipeline[1]
+        ):
+            add_fields = pipeline[1].get("$addFields", {})
+            doc_key = next(iter(add_fields), None)
+            doc_val = add_fields[doc_key] if doc_key else None
+
+            if isinstance(doc_val, dict):
+                parsed = {
+                    "db": parsed.get("db", "dsci351"),
+                    "collection": parsed.get("collection", ""),
+                    "insertOne": {
+                        "document": doc_val
+                    }
+                }
+
+        elif not any(mod_op in stage for stage in pipeline if isinstance(stage, dict) for mod_op in ["$insertOne", "$insertMany", "$updateOne", "$deleteOne"]):
+            return {
+                "error": "Unsupported or unrecognized MongoDB pipeline structure."
+            }
+
+
+        # Override the db name
+        parsed["db"] = "dsci351"
+
+
+        # Normalize Gemini’s collection names to match ours
+        collection_map = {
+            "vehicles": "electric_vehicles",
+            "evs": "electric_vehicles",
+            "cars": "electric_vehicles",
+            "electricvehicledata": "electric_vehicles",
+            "air_quality_data": "air_quality",
+            "measurements": "air_quality",
+            "records": "air_quality",
+            "air_quality_readings": "air_quality",
+            "airquality": "air_quality",
+            "pollution_data": "air_quality",
+            "movies": "imdb_top_1000",
+            "films": "imdb_top_1000",
+            "imdb": "imdb_top_1000",
+            "top_movies": "imdb_top_1000",
+            "cities": "city_info"
+        }
+        
+        if table:
+            parsed["collection"] = table
+        else:
+            parsed["collection"] = collection_map.get(parsed.get("collection", ""), parsed.get("collection", ""))
+
+
+        # Field/value normalization mappings
+        field_rename_map = {
+            "make": "Make",
+            "manufacturer": "Make",
+            "model": "Model",
+            "year": "model_year",
+            "range": "electric_range",
+            "fuel_type": "vehicle_type",
+            "powertrain": "vehicle_type",
+            "type": "vehicle_type",
+            "vin": "vin",
+            "price": "base_msrp",
+            "location": "geo_place",
+            "pollutionvalue": "data_value",
+            "pollution_value": "data_value",
+            "value": "data_value",
+            "measurement": "data_value",
+            "category": "air_quality_category",
+            "airqualitycategory": "air_quality_category",
+            "air_quality_category": "air_quality_category",
+            "location_name": "geo_place",  
+            "city_name": "geo_place" 
+        }
+        value_normalize_map = {
+            "Make": {
+                "Ford": "FORD",
+                "Tesla": "TESLA",
+                "Jeep": "JEEP"
+            },
+            "vehicle_type": {
+                "electric": "Battery Electric Vehicle (BEV)",
+                "hybrid": "Plug-in Hybrid Electric Vehicle (PHEV)",
+                "EV": "Battery Electric Vehicle (BEV)"
+            }
+        }
+
+        # Normalize pipeline stages
+        for stage in parsed.get("pipeline", []):
+            if "$match" in stage:
+                new_match = {}
+                for k, v in stage["$match"].items():
+                    normalized_key = field_rename_map.get(k.lower(), k)
+                    # Canonicalize value
+                    canon_values = value_normalize_map.get(normalized_key, {})
+                    new_match[normalized_key] = canon_values.get(v, v)
+                stage["$match"] = new_match
+            elif "$project" in stage:
+                new_project = {}
+                for k, v in stage["$project"].items():
+                    normalized_key = field_rename_map.get(k.lower(), k)
+                    new_project[normalized_key] = v
+                stage["$project"] = new_project
+            elif "$group" in stage:
+                group_stage = stage["$group"]
+                new_group_stage = {}
+                for k, v in group_stage.items():
+                    if isinstance(v, dict):  # e.g. "$avg": "$pollutionValue"
+                        new_v = {}
+                        for op, field in v.items():
+                            # Normalize field inside aggregation
+                            field_clean = field.lstrip("$").lower()
+                            normalized_field = field_rename_map.get(field_clean, field_clean)
+                            new_v[op] = f"${normalized_field}"
+                        new_group_stage[k] = new_v
+                    elif isinstance(v, str) and v.startswith("$"):
+                        field_clean = v.lstrip("$").lower()
+                        normalized_field = field_rename_map.get(field_clean, field_clean)
+                        new_group_stage[k] = f"${normalized_field}"
+                    else:
+                        new_group_stage[k] = v
+                stage["$group"] = new_group_stage
+            elif "$sort" in stage:
+                new_sort = {}
+                for k, v in stage["$sort"].items():
+                    normalized_key = field_rename_map.get(k.lower(), k)
+                    new_sort[normalized_key] = v
+                stage["$sort"] = new_sort
+            elif "$lookup" in stage:
+                lookup_stage = stage["$lookup"]
+
+                # Normalize collection name
+                lookup_stage["from"] = collection_map.get(lookup_stage.get("from", ""), lookup_stage.get("from", ""))
+
+                # Normalize field names
+                for key in ["localField", "foreignField", "as"]:
+                    if key in lookup_stage:
+                        normalized_key = field_rename_map.get(lookup_stage[key].lower(), lookup_stage[key])
+                        lookup_stage[key] = normalized_key
+
+                stage["$lookup"] = lookup_stage
+
+
+        for mod_key in ["insertOne", "insertMany", "updateOne", "deleteOne"]:
+            if mod_key in parsed:
+                mod_obj = parsed[mod_key]
+                for key in ["document", "filter", "update"]:
+                    if key in mod_obj and isinstance(mod_obj[key], dict):
+                        normalized = {}
+                        for k, v in mod_obj[key].items():
+                            new_k = field_rename_map.get(k.lower(), k)
+                            val_map = value_normalize_map.get(new_k, {})
+                            normalized[new_k] = val_map.get(v, v)
+                        mod_obj[key] = normalized
+                parsed[mod_key] = mod_obj
+                print("Final MongoDB Modification JSON:", json.dumps(parsed, indent=2))
+                return parsed
+
+        return parsed
         
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"parse_with_gemini() failed: {str(e)}"}

@@ -20,5 +20,13 @@ if __name__ == "__main__":
     # print("\nSchema Query 3: Show samples from air_quality")
     # print(handle_query("Show sample rows from air_quality", "sql", table="air_quality"))
 
-    print("EV")
-    print(handle_query("Add a new EV with VIN ABC123, made by FORD in 2023, model Mustang, and electric range of 300.", "sql", table="electric_vehicles"))
+    # print("EV")
+    # print(handle_query("Find the electric vehicle with VIN 123ABC", "sql", table="electric_vehicles"))
+
+    #print("Mongo Schema 1: List collections")
+    #print(handle_query("List 10 air quality readings", "nosql"))
+
+    #print("Mongo Schema 2: Sample electric vehicles")
+    # print(handle_query("Insert a new air quality reading with geo_place Queens and data_value 0.7", "nosql",table="air_quality"))
+
+    print(handle_query("Show all air quality readings where geo_place is Queens and data_value is 0.7", "nosql", table="air_quality"))
