@@ -11,6 +11,112 @@ def parse_nl_query(nl_query: str, db_type: str, table: str = ""):
     query_lower = nl_query.lower()
 
     # Creating our own parse rules to try first and resort to LLMs if they fail
+    if db_type == "sql":
+        if "cafv eligibility" in query_lower and "electric vehicles" in query_lower:
+            return {
+                "sql": """
+                    SELECT ev.*, cafv.cafv_eligibility
+                    FROM electric_vehicles ev
+                    JOIN electric_vehicle_cafv cafv ON ev.vin = cafv.vin;
+                """
+            }
+
+        if "runtime" in query_lower and "movie" in query_lower:
+            return {
+                "sql": """
+                    SELECT imdb.*, rt.runtime
+                    FROM imdb_top_1000 imdb
+                    JOIN imdb_runtime rt ON imdb.title = rt.title;
+                """
+            }
+
+        if "geo type" in query_lower and "air quality" in query_lower:
+            return {
+                "sql": """
+                    SELECT aq.*, gt.geo_type
+                    FROM air_quality aq
+                    JOIN air_quality_geotype gt ON aq.unique_id = gt.unique_id;
+                """
+            }
+    if db_type == "nosql":
+        if "cafv eligibility" in query_lower and "electric vehicles" in query_lower:
+            return {
+                "db": "dsci351",
+                "collection": "electric_vehicles",
+                "pipeline": [
+                    {
+                        "$lookup": {
+                            "from": "electric_vehicle_cafv",
+                            "localField": "vin",
+                            "foreignField": "vin",
+                            "as": "cafv_info"
+                        }
+                    },
+                    { "$unwind": "$cafv_info" },
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "vin": 1,
+                            "Make": 1,
+                            "Model": 1,
+                            "cafv_info.cafv_eligibility": 1
+                        }
+                    }
+                ]
+            }
+        if "runtime" in query_lower and ("movie" in query_lower or "film" in query_lower):
+            return {
+                "db": "dsci351",
+                "collection": "imdb_top_1000",
+                "pipeline": [
+                    {
+                        "$lookup": {
+                            "from": "imdb_runtime",
+                            "localField": "title",
+                            "foreignField": "title",
+                            "as": "runtime_info"
+                        }
+                    },
+                    { "$unwind": "$runtime_info" },
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "title": 1,
+                            "genre": 1,
+                            "imdb_rating": 1,
+                            "runtime_info.runtime": 1
+                        }
+                    }
+                ]
+            }
+        if "geo type" in query_lower and "air quality" in query_lower:
+            return {
+                "db": "dsci351",
+                "collection": "air_quality",
+                "pipeline": [
+                    {
+                        "$lookup": {
+                            "from": "air_quality_geotype",
+                            "localField": "unique_id",
+                            "foreignField": "unique_id",
+                            "as": "geo_info"
+                        }
+                    },
+                    { "$unwind": "$geo_info" },
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "unique_id": 1,
+                            "geo_place": 1,
+                            "data_value": 1,
+                            "geo_info.geo_type": 1
+                        }
+                    }
+                ]
+            }
+        
+
+
 
     # Schema exploration logic
 

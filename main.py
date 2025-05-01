@@ -21,12 +21,27 @@ if __name__ == "__main__":
     # print(handle_query("Show sample rows from air_quality", "sql", table="air_quality"))
 
     # print("EV")
-    # print(handle_query("Find the electric vehicle with VIN 123ABC", "sql", table="electric_vehicles"))
+
+    '''
+    print(handle_query("describe the air quality dataset", "sql", table='air_quality'))
+    print(handle_query("List air quality data with geo type included", "nosql"))
+    '''
+    
+    '''
+    print(handle_query("describe the electric_vehicles dataset", "sql", table='electric_vehicles'))
+    print(handle_query("Show the CAFV eligibility for all electric vehicles", "nosql"))
+    '''
+
+    '''
+    print(handle_query("describe movies", "sql", table='imdb_top_1000'))
+    print(handle_query("Get the runtime of all top-rated movies", "nosql"))
+    '''
+
 
     #print("Mongo Schema 1: List collections")
-    #print(handle_query("Show top 10 movies by IMDB rating", "nosql", table="imdb_top_1000"))
+    # print(handle_query("show details", "nosql"))
 
     #print("Mongo Schema 2: Sample electric vehicles")
     #print(handle_query("Delete a new air quality reading with geo_place Queens and data_value 0.7", "nosql",table="air_quality"))
 
-    print(handle_query("Show all air quality readings where geo_place is Queens and data_value is 0.7", "nosql", table="air_quality"))
+    #print(handle_query("Show all air quality readings where geo_place is Queens and data_value is 0.7", "nosql", table="air_quality"))

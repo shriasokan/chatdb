@@ -6,18 +6,17 @@ import pprint
 conn = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="",  # <-- Put your actual password here
+    password="",  
     database="dsci351"
 )
 
 cursor = conn.cursor()
 
-# Step 1: Get list of all tables
+
 cursor.execute("SHOW TABLES")
 tables = cursor.fetchall()
 table_names = [table[0] for table in tables]
 
-# Step 2: For each table, get column names and a few sample rows
 schema_info = {}
 
 for table in table_names:
