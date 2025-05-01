@@ -1,11 +1,11 @@
 import pandas as pd
 from pymongo import MongoClient
 
-# Connect to MongoDB
+
 client = MongoClient("mongodb://localhost:27017/")
 db = client["dsci351"]
 
-# Load EV data
+
 ev_df = pd.read_csv("Electric_Vehicle_Population_Data.csv")
 
 ev_df = ev_df.rename(columns={
@@ -23,6 +23,8 @@ ev_df = ev_df.rename(columns={
     '2020 Census Tract': 'census_tract'
 })
 
+ev_df = ev_df.drop(columns=['cafv_eligibility'])
+
 ev_df = ev_df.where(pd.notnull(ev_df), None)
 ev_data = ev_df.to_dict(orient="records")
 
@@ -30,7 +32,7 @@ db.electric_vehicles.drop()
 db.electric_vehicles.insert_many(ev_data)
 print("Inserted Electric Vehicles into MongoDB.")
 
-# Load IMDB Data
+
 imdb_df = pd.read_csv("imdb_top_1000.csv", on_bad_lines="skip")
 
 imdb_df = imdb_df.rename(columns={
@@ -58,13 +60,15 @@ imdb_df["meta_score"] = pd.to_numeric(imdb_df["meta_score"], errors="coerce")
 imdb_df["no_of_votes"] = pd.to_numeric(imdb_df["no_of_votes"], errors="coerce")
 imdb_df = imdb_df.where(pd.notnull(imdb_df), None)
 
+imdb_df = imdb_df.drop(columns=['runtime'])
+
 imdb_data = imdb_df.to_dict(orient="records")
 
 db.imdb_top_1000.drop()
 db.imdb_top_1000.insert_many(imdb_data)
 print("Inserted IMDB Top 1000 into MongoDB")
 
-# Load air quality data
+
 air_df = pd.read_csv("updated_air_quality_data.csv")
 
 air_df = air_df.rename(columns={
@@ -78,6 +82,8 @@ air_df = air_df.rename(columns={
     "Data Value": "data_value",
     "Air Quality Category": "air_quality_category"
 })
+
+air_df = air_df.drop(columns=['geo_type'])
 
 air_df = air_df.where(pd.notnull(air_df), None)
 air_data = air_df.to_dict(orient="records")

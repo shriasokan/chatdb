@@ -9,7 +9,6 @@ conn = mysql.connector.connect(
 )
 cursor = conn.cursor()
 
-# Load Electric Vehicles
 ev_df = pd.read_csv("Electric_Vehicle_Population_Data.csv")
 
 ev_df = ev_df.rename(columns={
@@ -28,7 +27,7 @@ ev_df = ev_df.rename(columns={
 
 ev_df = ev_df[[
     'vin', 'County', 'City', 'State', 'postal_code', 'model_year',
-    'Make', 'Model', 'vehicle_type', 'cafv_eligibility',
+    'Make', 'Model', 'vehicle_type', 
     'electric_range', 'base_msrp', 'legislative_district',
     'dol_vehicle_id', 'vehicle_location', 'electric_utility'
 ]]
@@ -41,13 +40,13 @@ for _, row in ev_df.iterrows():
     cursor.execute("""
         INSERT INTO electric_vehicles (
             vin, county, city, state, postal_code, model_year,
-            make, model, vehicle_type, cafv_eligibility,
+            make, model, vehicle_type, 
             electric_range, base_msrp, legislative_district,
             dol_vehicle_id, vehicle_location, electric_utility                  
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
     """, values)
 
-# Load IMDB
+
 imdb_df = pd.read_csv("imdb_top_1000.csv", on_bad_lines='skip')
 
 imdb_df = imdb_df.rename(columns={
@@ -77,7 +76,7 @@ imdb_df["no_of_votes"] = pd.to_numeric(imdb_df["no_of_votes"], errors="coerce")
 imdb_df = imdb_df.where(pd.notnull(imdb_df), None)
 
 imdb_df = imdb_df[[
-    'Poster_Link', 'title', 'release_year', 'certificate', 'runtime',
+    'Poster_Link', 'title', 'release_year', 'certificate', 
     'genre', 'imdb_rating', 'overview', 'meta_score',
     'director', 'star1', 'star2', 'star3', 'star4',
     'no_of_votes', 'gross'
@@ -87,14 +86,13 @@ for _, row in imdb_df.iterrows():
     values = [None if pd.isna(x) else x for x in row.values.tolist()]
     cursor.execute("""
         INSERT INTO imdb_top_1000 (
-            poster_link, title, release_year, certificate, runtime,
+            poster_link, title, release_year, certificate, 
             genre, imdb_rating, overview, meta_score,
             director, star1, star2, star3, star4,
             no_of_votes, gross       
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, values)
 
-# Load Air Quality
 air_df = pd.read_csv("updated_air_quality_data.csv")
 
 air_df = air_df.rename(columns={
@@ -110,17 +108,19 @@ air_df = air_df.rename(columns={
 })
 
 air_df = air_df[[
-    'unique_id', 'name', 'measure', 'geo_type', 'geo_place',
+    'unique_id', 'name', 'measure', 'geo_place',
     'time_period', 'start_date', 'data_value', 'air_quality_category'
 ]]
+
+air_df = air_df.where(pd.notnull(air_df), None)
 
 for _, row in air_df.iterrows():
     values = [None if pd.isna(x) else x for x in row.values.tolist()]
     cursor.execute("""
         INSERT INTO air_quality (
-            unique_id, name, measure, geo_type, geo_place,
+            unique_id, name, measure, geo_place,
             time_period, start_date, data_value, air_quality_category       
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
     """, values)
 
 conn.commit()
