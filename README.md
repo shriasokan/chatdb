@@ -26,8 +26,9 @@ python -m venv .venv
 source .venv/bin/activate # On Windows: .venv\Scripts\activate
 ```
 ### 2. Install Dependencies
+```bash
 pip install -r requirements.txt
-
+```
 ### 3. Add Your Gemini API Key
 Create a file named `.env` in the root directory:
 ```ini
